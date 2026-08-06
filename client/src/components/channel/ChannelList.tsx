@@ -160,6 +160,7 @@ const {
         {/* Workspace Header */}
       <div className="relative border-b border-[#23263A] p-6">
         <motion.button
+          onClick={() => setWorkspaceMenuOpen((open) => !open)}
           whileHover={{ y: -1 }}
           whileTap={{ scale: 0.99 }}
           className="group w-full rounded-2xl border border-[#23263A] bg-[#141621] p-4 text-left shadow-xl shadow-black/20 transition duration-200 hover:border-[#6D4AFF]/70 hover:shadow-[#8B5CF6]/10"

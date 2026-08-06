@@ -28,10 +28,11 @@ export interface IWorkspace {
   name: string;
   description?: string;
   ownerId: string;
-  members: string[] | IUser[];
-  channels: string[] | IChannel[];
+  members: (string | IUser)[];
+  channels: (string | IChannel)[];
   inviteToken?: string;
   createdAt: string;
+  unreadCount?: number;
 }
 
 export interface IChannel {
@@ -40,6 +41,7 @@ export interface IChannel {
   workspaceId: string;
   messages: string[] | IMessage[];
   createdAt: string;
+  unreadCount?: number;
 }
 
 export interface IMessage {

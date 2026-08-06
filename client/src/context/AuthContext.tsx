@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { IUser } from '../types/index.ts';
+import api from '../services/api.ts';
 
 export interface AuthContextType {
   user: IUser | null;
@@ -18,21 +19,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // On mount: check localStorage for existing token + user, restore state
   useEffect(() => {
-    try {
+    const restoreSession = async () => {
       const storedToken = localStorage.getItem('token');
       const storedUser = localStorage.getItem('user');
 
       if (storedToken && storedUser) {
-        setToken(storedToken);
-        setUser(JSON.parse(storedUser) as IUser);
+        try {
+          // Set initial local state to prevent visual login flash
+          setToken(storedToken);
+          setUser(JSON.parse(storedUser) as IUser);
+
+          const response = await api.get('/auth/me');
+          const verifiedUser = response.data?.data || response.data;
+          setUser(verifiedUser);
+          localStorage.setItem('user', JSON.stringify(verifiedUser));
+        } catch (error) {
+          console.error('Session verification failed, logging out:', error);
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          setToken(null);
+          setUser(null);
+        }
       }
-    } catch (error) {
-      console.error('Failed to parse user from localStorage:', error);
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-    } finally {
       setLoading(false);
-    }
+    };
+
+    void restoreSession();
   }, []);
 
   const login = (newToken: string, newUser: IUser) => {

@@ -3,6 +3,7 @@ import { Copy, Pencil, Trash2, Reply } from "lucide-react";
 
 interface Props {
   content: string;
+  isOwn: boolean;
   onReply: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -10,6 +11,7 @@ interface Props {
 
 const MessageActions: React.FC<Props> = ({
   content,
+  isOwn,
   onReply,
   onEdit,
   onDelete,
@@ -37,21 +39,25 @@ const MessageActions: React.FC<Props> = ({
         <Reply size={15} />
       </button>
 
-      <button
-        title="Edit"
-        onClick={onEdit}
-        className="rounded p-2 hover:bg-[#1A1A24]"
-      >
-        <Pencil size={15} />
-      </button>
+      {isOwn && (
+        <>
+          <button
+            title="Edit"
+            onClick={onEdit}
+            className="rounded p-2 hover:bg-[#1A1A24]"
+          >
+            <Pencil size={15} />
+          </button>
 
-      <button
-        title="Delete"
-        onClick={onDelete}
-        className="rounded p-2 text-red-400 hover:bg-red-500/20"
-      >
-        <Trash2 size={15} />
-      </button>
+          <button
+            title="Delete"
+            onClick={onDelete}
+            className="rounded p-2 text-red-400 hover:bg-red-500/20"
+          >
+            <Trash2 size={15} />
+          </button>
+        </>
+      )}
 
     </div>
   );
