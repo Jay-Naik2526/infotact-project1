@@ -124,6 +124,13 @@ export const createMessage = async (req: Request, res: Response): Promise<void> 
       clientTempId,
     });
 
+    const workspaceId = channel.workspace.toString();
+    io.to(workspaceId).emit("workspace:message", {
+      workspaceId,
+      channelId,
+      message: formatted,
+    });
+
     res.status(201).json({
       success: true,
       message: "Message created successfully",
@@ -258,82 +265,40 @@ export const toggleMessageReaction = async (req: Request, res: Response): Promis
       return;
     }
 
-    const userObjectId = new mongoose.Types.ObjectId(userId);
-    const reactions = { $ifNull: ["$reactions", []] };
-    const isSelectedEmoji = { $eq: ["$$reaction.emoji", emoji] };
-
-    // A single atomic pipeline prevents duplicate users and handles simultaneous clicks.
-    const message = await Message.findByIdAndUpdate(
-      messageId,
-      [
-        {
-          $set: {
-            reactions: {
-              $let: {
-                vars: {
-                  matchingEmoji: {
-                    $filter: {
-                      input: reactions,
-                      as: "reaction",
-                      cond: isSelectedEmoji,
-                    },
-                  },
-                },
-                in: {
-                  $cond: [
-                    { $gt: [{ $size: "$$matchingEmoji" }, 0] },
-                    {
-                      $filter: {
-                        input: {
-                          $map: {
-                            input: reactions,
-                            as: "reaction",
-                            in: {
-                              $cond: [
-                                isSelectedEmoji,
-                                {
-                                  $mergeObjects: [
-                                    "$$reaction",
-                                    {
-                                      users: {
-                                        $filter: {
-                                          input: { $ifNull: ["$$reaction.users", []] },
-                                          as: "reactionUser",
-                                          cond: { $ne: ["$$reactionUser", userObjectId] },
-                                        },
-                                      },
-                                    },
-                                  ],
-                                },
-                                "$$reaction",
-                              ],
-                            },
-                          },
-                        },
-                        as: "reaction",
-                        cond: { $gt: [{ $size: "$$reaction.users" }, 0] },
-                      },
-                    },
-                    {
-                      $concatArrays: [
-                        reactions,
-                        [{ emoji, users: [userObjectId] }],
-                      ],
-                    },
-                  ],
-                },
-              },
-            },
-          },
-        },
-      ],
-      { new: true }
-    );
-
+    const message = await Message.findById(messageId);
     if (!message) {
       res.status(404).json({ success: false, message: "Message not found" });
       return;
     }
+
+    const userObjectId = new mongoose.Types.ObjectId(userId);
+    const reactionIndex = message.reactions.findIndex((r) => r.emoji === emoji);
+
+    if (reactionIndex > -1) {
+      const userIndex = message.reactions[reactionIndex].users.findIndex(
+        (u) => u.toString() === userId
+      );
+
+      if (userIndex > -1) {
+        // User already reacted: remove user
+        message.reactions[reactionIndex].users.splice(userIndex, 1);
+        // If no users left for this emoji, remove the emoji reaction completely
+        if (message.reactions[reactionIndex].users.length === 0) {
+          message.reactions.splice(reactionIndex, 1);
+        }
+      } else {
+        // User hasn't reacted: add user
+        message.reactions[reactionIndex].users.push(userObjectId);
+      }
+    } else {
+      // Emoji reaction doesn't exist: create new one
+      message.reactions.push({
+        emoji,
+        users: [userObjectId],
+      });
+    }
+
+    await message.save();
 
     const formatted = formatMessageResponse(message);
     io.to(message.channel.toString()).emit("chat:reaction", {

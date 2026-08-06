@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import Channels from '../models/Channels';
 import Workspace from '../models/Workspace';
 import formatChannelName from '../utils/formatChannelName';
+import { io } from '../socket/socketServer';
 
 // ======================
 // Create Channel
@@ -65,6 +66,11 @@ export const createChannel = async (req: Request, res: Response): Promise<void> 
     // Push channel ID to workspace's channels array
     workspace.channels.push(channel._id as any);
     await workspace.save();
+
+    io.to(workspaceId).emit('channel:created', {
+      workspaceId,
+      channel,
+    });
 
     res.status(201).json({
       success: true,
