@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import api from "../../services/api.ts";
 import { useWorkspace } from '../../hooks/useWorkspace.ts';
 import { ChevronDown, UserPlus, Check, Copy } from 'lucide-react';
 
@@ -9,18 +10,26 @@ export const WorkspaceHeader: React.FC = () => {
 
   const handleInviteClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
+
     if (!activeWorkspace) return;
 
-    // Use inviteToken if present, otherwise generate a mock one for presentation
-    const token = activeWorkspace.inviteToken || 'mock-invite-token';
-    const inviteUrl = `${window.location.origin}/join/${token}`;
-
     try {
+      const response = await api.post("/workspaces/invite", {
+        workspaceId: activeWorkspace.id,
+      });
+
+      const inviteUrl =
+        response.data.inviteLink ||
+        `${window.location.origin}/invite/${response.data.inviteToken}`;
+
       await navigator.clipboard.writeText(inviteUrl);
+
       setCopied(true);
+
       setTimeout(() => setCopied(false), 2000);
+
     } catch (err) {
-      console.error('Failed to copy invite link:', err);
+      console.error(err);
     }
   };
 

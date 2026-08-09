@@ -217,8 +217,13 @@ const MembersPanel: React.FC = () => {
       <div className="mt-4 border-t border-[#1E1E2F] pt-3 text-center text-xs text-gray-500">
         {members.length} {members.length === 1 ? "member" : "members"}
       </div>
-
-      <InviteMemberModal isOpen={openInvite && isOwner} onClose={() => setOpenInvite(false)} />
+      <InviteMemberModal
+      isOpen={openInvite && isOwner}
+      onClose={() => {
+        setOpenInvite(false);
+        fetchMembers();
+      }}
+    />
     </div>
   );
 };

@@ -28,6 +28,7 @@ const InviteMemberModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
+  const [email, setEmail] = useState("");
 
   useEffect(() => {
     if (!isOpen) return;
@@ -85,6 +86,44 @@ const InviteMemberModal: React.FC<Props> = ({ isOpen, onClose }) => {
     }
   };
 
+  const handleAddMember = async () => {
+  if (!activeWorkspace) return;
+
+  if (!email.trim()) {
+    showToast("Please enter member email", "error");
+    return;
+  }
+
+  try {
+    setLoading(true);
+
+    await api.post(
+      `/workspaces/${activeWorkspace.id}/members`,
+      {
+        email,
+      }
+    );
+
+    showToast("Member added successfully");
+
+    setEmail("");
+
+    onClose();
+
+  } catch (err: any) {
+    console.error(err);
+
+    showToast(
+      err.response?.data?.message || "Failed to add member",
+      "error"
+    );
+
+  } finally {
+    setLoading(false);
+  }
+};
+
+
   const openShareLink = (url: string) => {
     window.open(url, "_blank", "noopener,noreferrer");
   };
@@ -136,6 +175,31 @@ const InviteMemberModal: React.FC<Props> = ({ isOpen, onClose }) => {
             with a secure invite link.
           </p>
         </div>
+        
+
+        <div className="rounded-2xl border border-[#1E293B] bg-[#0A0A0F] p-4">
+
+  <div className="mb-3 text-sm font-semibold text-white">
+    Add Member by Email
+  </div>
+
+  <input
+    type="email"
+    placeholder="Enter member email"
+    value={email}
+    onChange={(e) => setEmail(e.target.value)}
+    className="mb-3 h-11 w-full rounded-xl border border-[#1E293B] bg-[#111118] px-3 text-white outline-none"
+  />
+
+  <button
+    onClick={handleAddMember}
+    disabled={loading}
+    className="h-11 w-full rounded-xl bg-violet-600 text-white font-semibold hover:bg-violet-700"
+  >
+    Add Member
+  </button>
+
+</div>
 
         <div className="space-y-5 p-6">
           <div className="rounded-2xl border border-[#1E293B] bg-[#0A0A0F] p-4">

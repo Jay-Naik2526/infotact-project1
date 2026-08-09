@@ -607,18 +607,20 @@ export const getWorkspaceMembers = async (req: Request, res: Response): Promise<
     });
   }
 };
-
 // ======================
 // Add Member to Workspace
 // ======================
 export const addMember = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { userId } = req.body;
+    const { email } = req.body;
     const currentUserId = req.user!.id;
 
-    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
-      res.status(400).json({ success: false, message: 'A valid userId is required' });
+    if (!email) {
+      res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
       return;
     }
 
@@ -627,7 +629,7 @@ export const addMember = async (req: Request, res: Response): Promise<void> => {
     if (!workspace) {
       res.status(404).json({
         success: false,
-        message: 'Workspace not found',
+        message: "Workspace not found",
       });
       return;
     }
@@ -636,59 +638,84 @@ export const addMember = async (req: Request, res: Response): Promise<void> => {
     if (workspace.createdBy.toString() !== currentUserId) {
       res.status(403).json({
         success: false,
-        message: 'Only workspace creator can add members',
+        message: "Only workspace creator can add members",
       });
       return;
     }
 
-    // Check if user exists
-    const user = await User.findById(userId);
+    // Find user by email
+    const user = await User.findOne({
+      email: email.trim().toLowerCase(),
+    });
+
     if (!user) {
       res.status(404).json({
         success: false,
-        message: 'User not found',
+        message: "User not found",
       });
       return;
     }
+
+    const userId = user._id.toString();
 
     // Check if already a member
     if (workspace.members.some((m: any) => m.toString() === userId)) {
       res.status(400).json({
         success: false,
-        message: 'User is already a member',
+        message: "User is already a member",
       });
       return;
     }
 
+    // Add member to workspace and workspace to user
     await Promise.all([
-      Workspace.updateOne({ _id: workspace._id }, { $addToSet: { members: user._id } }),
-      User.updateOne({ _id: user._id }, { $addToSet: { workspaces: workspace._id } }),
+      Workspace.updateOne(
+        { _id: workspace._id },
+        { $addToSet: { members: user._id } }
+      ),
+      User.updateOne(
+        { _id: user._id },
+        { $addToSet: { workspaces: workspace._id } }
+      ),
     ]);
-    const member = await User.findById(user._id).select('name email');
-    const payload = { workspaceId: workspace._id.toString(), memberId: user._id.toString(), member };
+
+    // Fetch member details
+    const member = await User.findById(user._id).select("name email");
+
+    const payload = {
+      workspaceId: workspace._id.toString(),
+      memberId: user._id.toString(),
+      member,
+    };
+
+    // Socket Events
     if (io) {
-      io.to(workspace._id.toString()).emit('workspace:member-added', payload);
-      io.to(`user:${user._id.toString()}`).emit('workspace:member-added', payload);
+      io.to(workspace._id.toString()).emit("workspace:member-added", payload);
+      io.to(`user:${user._id.toString()}`).emit("workspace:member-added", payload);
     }
+
+    // Create Notification
     await createNotification({
       recipient: user._id,
       actor: currentUserId,
-      type: 'workspace:invite',
-      title: 'Workspace invitation',
+      type: "workspace:invite",
+      title: "Workspace Invitation",
       body: `You were added to ${workspace.name}.`,
       workspace: workspace._id,
     });
 
     res.status(200).json({
       success: true,
-      message: 'Member added successfully',
-      data: { ...payload, workspaceId: workspace._id.toString() },
+      message: "Member added successfully",
+      data: payload,
     });
+
   } catch (error) {
-    console.error('Add Member Error:', error);
+    console.error("Add Member Error:", error);
+
     res.status(500).json({
       success: false,
-      message: 'Internal Server Error',
+      message: "Internal Server Error",
     });
   }
 };
