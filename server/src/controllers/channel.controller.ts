@@ -3,7 +3,9 @@ import Channels from '../models/Channels';
 import Workspace from '../models/Workspace';
 import formatChannelName from '../utils/formatChannelName';
 import { io } from '../socket/socketServer';
+
 import { notifyWorkspaceMembers } from '../services/notification.service';
+
 
 // ======================
 // Create Channel
@@ -64,18 +66,13 @@ export const createChannel = async (req: Request, res: Response): Promise<void> 
       createdBy: userId,
     });
 
-    // Push channel ID to workspace's channels array
+  // Push channel ID to workspace's channels array
     workspace.channels.push(channel._id as any);
     await workspace.save();
 
-    if (io) io.to(workspace._id.toString()).emit('channel:created', { workspaceId: workspace._id.toString(), channel });
-    await notifyWorkspaceMembers(workspace.members, {
-      actor: userId,
-      type: 'channel:created',
-      title: 'Channel created',
-      body: `#${channel.name} was created in ${workspace.name}.`,
-      workspace: workspace._id,
-      channel: channel._id,
+    io.to(workspaceId).emit('channel:created', {
+      workspaceId,
+      channel,
     });
 
     res.status(201).json({

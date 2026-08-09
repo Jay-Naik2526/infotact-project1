@@ -81,6 +81,9 @@ export async function initSocket(
       `Socket Connected: ${socket.id} | User: ${socket.data.userId}`
     );
 
+    // Join personal user room
+    socket.join(socket.data.userId);
+
     // Online Users
     onlineUsers.add(socket.data.userId);
 

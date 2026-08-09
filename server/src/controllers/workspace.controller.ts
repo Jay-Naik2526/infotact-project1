@@ -704,10 +704,27 @@ export const addMember = async (req: Request, res: Response): Promise<void> => {
       workspace: workspace._id,
     });
 
+    // Emit workspace:member-added to existing workspace members
+    io.to(workspace._id.toString()).emit('workspace:member-added', {
+      workspaceId: workspace._id.toString(),
+      memberId: userId,
+    });
+
+    // Populate full details before emitting workspace to the added user
+    const populatedWorkspace = await Workspace.findById(workspace._id)
+      .populate('createdBy', 'name email')
+      .populate('members', 'name email')
+      .populate('channels');
+
+    // Emit workspace:added directly to the newly added user's personal room
+    io.to(userId).emit('workspace:added', {
+      workspace: populatedWorkspace,
+    });
+
     res.status(200).json({
       success: true,
       message: "Member added successfully",
-      data: payload,
+      data: populatedWorkspace,
     });
 
   } catch (error) {

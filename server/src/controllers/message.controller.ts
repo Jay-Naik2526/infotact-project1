@@ -56,12 +56,59 @@ export const createMessage = async (req: Request, res: Response): Promise<void> 
       const mentioned = await User.findOne({ name: new RegExp(`^${escaped(match[1])}$`, "i") }).select("_id");
       if (mentioned && mentioned.id !== userId) recipients.add(mentioned.id);
     }
-    await Promise.all([...recipients].map((recipient) => createNotification({ recipient, actor: userId, type: "message:mention", title: "You were mentioned", body: `${actor?.name || "Someone"} mentioned you in #${membership.channel.name}.`, workspace: membership.workspace._id, channel: membership.channel._id, message: message._id })));
+    await Promise.all(
+      [...recipients].map((recipient) =>
+        createNotification({
+          recipient,
+          actor: userId,
+          type: "message:mention",
+          title: "You were mentioned",
+          body: `${actor?.name || "Someone"} mentioned you in #${membership.channel.name}.`,
+          workspace: membership.workspace._id,
+          channel: membership.channel._id,
+          message: message._id,
+        })
+      )
+    );
+
     const replyOwner = (populated.replyTo as any)?.sender?._id?.toString();
-    if (replyOwner && replyOwner !== userId) await createNotification({ recipient: replyOwner, actor: userId, type: "message:reply", title: "New reply", body: `${actor?.name || "Someone"} replied to your message in #${membership.channel.name}.`, workspace: membership.workspace._id, channel: membership.channel._id, message: message._id });
-    res.status(201).json({ success: true, message: "Message created successfully", data: { ...formatted, clientTempId } });
-  } catch (error) { console.error("Create Message Error:", error); res.status(500).json({ success: false, message: "Internal Server Error" }); }
-};
+
+    if (replyOwner && replyOwner !== userId) {
+      await createNotification({
+        recipient: replyOwner,
+        actor: userId,
+        type: "message:reply",
+        title: "New reply",
+        body: `${actor?.name || "Someone"} replied to your message in #${membership.channel.name}.`,
+        workspace: membership.workspace._id,
+        channel: membership.channel._id,
+        message: message._id,
+      });
+    }
+
+    const workspaceId = membership.workspace._id.toString();
+
+    io.to(workspaceId).emit("workspace:message", {
+      workspaceId,
+      channelId,
+      message: formatted,
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Message created successfully",
+      data: {
+        ...formatted,
+        clientTempId,
+      },
+    });
+  } catch (error) {
+    console.error("Create Message Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+    });
+  }
 
 export const getMessages = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -115,12 +162,62 @@ export const toggleMessageReaction = async (req: Request, res: Response): Promis
       didAddReaction = true;
     }
     await existing.save();
+
     const message = existing;
-    const formatted = formatMessageResponse(message); const reactionPayload = { messageId: formatted.id, reactions: formatted.reactions };
-    if (io) io.to(message.channel.toString()).emit("message:reaction", reactionPayload);
-    if (didAddReaction && message.sender.toString() !== userId) { const actor = await User.findById(userId).select("name"); await createNotification({ recipient: message.sender, actor: userId, type: "message:reaction", title: "New reaction", body: `${actor?.name || "Someone"} reacted ${emoji} to your message.`, workspace: membership.workspace._id, channel: message.channel, message: message._id }); }
-    res.status(200).json({ success: true, message: "Message reaction updated successfully", data: formatted });
-  } catch (error) { console.error("Toggle Message Reaction Error:", error); res.status(500).json({ success: false, message: "Unable to update message reaction" }); }
+    const formatted = formatMessageResponse(message);
+
+    const reactionPayload = {
+      messageId: formatted.id,
+      reactions: formatted.reactions,
+    };
+
+    if (io) {
+      io.to(message.channel.toString()).emit(
+        "message:reaction",
+        reactionPayload
+      );
+
+      // Keep the newer event name as well for compatibility.
+      io.to(message.channel.toString()).emit(
+        "chat:reaction",
+        reactionPayload
+      );
+    }
+
+    if (
+      didAddReaction &&
+      message.sender.toString() !== userId
+    ) {
+      const actor = await User.findById(userId).select("name");
+
+      await createNotification({
+        recipient: message.sender,
+        actor: userId,
+        type: "message:reaction",
+        title: "New reaction",
+        body: `${actor?.name || "Someone"} reacted ${emoji} to your message.`,
+        workspace: membership.workspace._id,
+        channel: message.channel,
+        message: message._id,
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Message reaction updated successfully",
+      data: formatted,
+    });
+  } catch (error) {
+    console.error(
+      "Toggle Message Reaction Error:",
+      error instanceof Error ? error.stack : error
+    );
+
+    res.status(500).json({
+      success: false,
+      message: "Unable to update message reaction",
+    });
+  }
 };
 
 export const deleteMessage = async (req: Request, res: Response): Promise<void> => {

@@ -72,6 +72,7 @@ export const MessageItem: React.FC<MessageItemProps> = memo(({
 
   <MessageActions
     content={message.content}
+    isOwn={isOwn}
     onReply={() => onReply(message)}
     onEdit={() => onEdit(message.id)}
     onDelete={() => onDelete(message.id)}

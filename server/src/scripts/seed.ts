@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
 import connectDB from '../config/db';
 import User from '../models/User';
@@ -25,11 +25,11 @@ const seed = async () => {
   try {
     // 1. Clear existing database collections
     console.log('Clearing existing data...');
-    await User.deleteMany({});
-    await Workspace.deleteMany({});
-    await Channels.deleteMany({});
-    await Message.deleteMany({});
-    console.log('Existing database cleared successfully.');
+    try { await User.collection.drop(); } catch (e) {}
+    try { await Workspace.collection.drop(); } catch (e) {}
+    try { await Channels.collection.drop(); } catch (e) {}
+    try { await Message.collection.drop(); } catch (e) {}
+    console.log('Existing database collections dropped successfully.');
 
     // 2. Generate hashed password
     const saltRounds = 10;
